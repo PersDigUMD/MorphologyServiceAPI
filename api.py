@@ -72,6 +72,7 @@ def hazmtoalpheios(word,uri):
         tagger = POSTagger(model="postagger.model")
         wordtagged = tagger.tag(item)
         wordpofs = wordtagged[0][1]
+        wordpofs = maptohazm(wordpofs)
         word = etree.SubElement(wordslist,'word')
         form = etree.SubElement(word, 'form', {'{http://www.w3.org/XML/1998/namespace}lang':'per'})
         form.text = item
@@ -80,10 +81,50 @@ def hazmtoalpheios(word,uri):
         term = etree.SubElement(infl, 'term', {'{http://www.w3.org/XML/1998/namespace}lang':'per'})
         stem = etree.SubElement(term, 'stem')
         stem.text = wordstem
-        pofs = etree.SubElement(infl, 'pofs')
-        pofs.text = wordpofs
+        pofs = etree.SubElement(infl, 'pofs', {'order':wordpofs[1]})
+        pofs.text = wordpofs[0]
     return root
 
+def maptohazm(wordpofs):
+    if wordpofs == "N":
+        wordpofs = ["noun",1]
+        return wordpofs
+    if wordpofs == "INT":
+        wordpofs = ["Interjection",2]
+        return wordpofs
+    if wordpofs == "DET":
+        wordpofs = ["Determiner",3]
+        return wordpofs
+    if wordpofs == "AJ":
+        wordpofs = ["Adjective",4]
+        return wordpofs
+    if wordpofs == "P":
+        wordpofs = ["Preposition",5]
+        return wordpofs
+    if wordpofs == "PRO":
+        wordpofs = ["Pronoun",6]
+        return wordpofs
+    if wordpofs == "CONJ":
+        wordpofs = ["Conjunction",7]
+        return wordpofs
+    if wordpofs == "V":
+        wordpofs = ["Verb",8]
+        return wordpofs
+    if wordpofs == "ADV":
+        wordpofs = ["Adverb",9]
+        return wordpofs
+    if wordpofs == "POSTP":
+        wordpofs = ["Postposition",10]
+        return wordpofs
+    if wordpofs == "Num":
+        wordpofs = ["Number",11]
+        return wordpofs
+    if wordpofs == "CL":
+        wordpofs = ["Classifier",12]
+        return wordpofs
+    if wordpofs == "e":
+        wordpofs = ["ezafe",13]
+        return wordpofs
 def hazmtoalpheiosfile(data,uri):
     root = etree.Element("{http://www.w3.org/1999/02/22-rdf-syntax-ns#}RDF")    
     oaannotation = etree.SubElement(root,'{http://www.w3.org/ns/oa#}Annotation',{'{http://www.w3.org/1999/02/22-rdf-syntax-ns#}about':'http://services.projectbamboo.org/morphology'+uri})
