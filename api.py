@@ -4,13 +4,14 @@ Created on Nov 7, 2015
 @author: elijah Cooke
 '''
 from __future__ import unicode_literals
-from flask import Flask,abort, jsonify
+from flask import Flask,abort, jsonify, json
 from flask_restful import Resource, Api, reqparse
 from hazm import POSTagger,word_tokenize, sent_tokenize
 from hazm.Stemmer import Stemmer
 from hazm.Lemmatizer import Lemmatizer
 from hazm.Normalizer import Normalizer
 import urllib
+import uuid
 
 try:
     from lxml import etree
@@ -41,18 +42,53 @@ except ImportError:
 app = Flask(__name__)
 api = Api(app)
 
+def toalpheiosxml(analysis):
+    root = etree.Element('words')
+    for item in analysis:
+        word = etree.SubElement(root,'word')
+        form = etree.SubElement(word, 'form', {'{http://www.w3.org/XML/1998/namespace}lang': item['form']['lang']})
+        form.text = item['form']['text']
+        for entry in item['entries']:
+            word.append(entrytoxml(entry))
+    return root
+
+def entrytoxml(entry):
+    root = etree.Element('entry')
+    dic = etree.SubElement(root,'dict')
+    hdwd = etree.SubElement(dic,'hdwd', {'{http://www.w3.org/XML/1998/namespace}lang':entry['dict']['hdwd']['lang']})
+    hdwd.text = entry['dict']['hdwd']['text']
+    for i in entry['infls']:
+      infl = etree.SubElement(root,'infl')
+      term = etree.SubElement(infl, 'term', {'{http://www.w3.org/XML/1998/namespace}lang':i['stem']['lang']})
+      stem = etree.SubElement(term, 'stem')
+      stem.text = i['stem']['text']
+      if i['pofs']['text']:
+        pofs = etree.SubElement(infl, 'pofs', {'order':i['pofs']['order']})
+        pofs.text = i['pofs']['text']
+    return root
+
+def tobspmorph(analysis):
+    root = etree.Element("{http://www.w3.org/1999/02/22-rdf-syntax-ns#}RDF")    
+    for word in analysis:
+        annotation_id = 'urn:TuftsMorphologyService:'+word['form']['text'] + ':' + word['engine']
+        oaannotation = etree.SubElement(root,'{http://www.w3.org/ns/oa#}Annotation',{'{http://www.w3.org/1999/02/22-rdf-syntax-ns#}about': annotation_id})
+        oahastarget = etree.SubElement(oaannotation,'{http://www.w3.org/ns/oa#}hasTarget')
+        desc = etree.SubElement(oahastarget,'{http://www.w3.org/1999/02/22-rdf-syntax-ns#}Description',{'{http://www.w3.org/1999/02/22-rdf-syntax-ns#}about':word['uri']})
+        title = etree.SubElement(oaannotation, '{http://purl.org/dc/elements/1.1/}title', {'{http://www.w3.org/XML/1998/namespace}lang':'eng'})
+        title.text = "Morphology of " + word['form']['text']
+        for entry in word['entries']:
+            entry_id = str(uuid.uuid1().urn)
+            oahasbody = etree.SubElement(oaannotation, '{http://www.w3.org/ns/oa#}hasBody',{'{http://www.w3.org/1999/02/22-rdf-syntax-ns#}resource':entry_id})
+            oabody = etree.SubElement(oaannotation, '{http://www.w3.org/ns/oa#}Body',{'{http://www.w3.org/1999/02/22-rdf-syntax-ns#}resource':entry_id})
+            bodytype = etree.SubElement(oabody, '{http://www.w3.org/1999/02/22-rdf-syntax-ns#}type',{'{http://www.w3.org/1999/02/22-rdf-syntax-ns#}resource':'http://www.w3.org/2008/content#ContentAsXML'})
+            content = etree.SubElement(oabody, '{http://www.w3.org/2008/content#}rest')
+            content.append(entrytoxml(entry))
+    return root
+
+#def analysistojson
 
 def hazmtoalpheios(word,uri):
-    root = etree.Element("{http://www.w3.org/1999/02/22-rdf-syntax-ns#}RDF")    
-    oaannotation = etree.SubElement(root,'{http://www.w3.org/ns/oa#}Annotation',{'{http://www.w3.org/1999/02/22-rdf-syntax-ns#}about':'http://services.projectbamboo.org/morphology'+uri})
-    oahasbody = etree.SubElement(oaannotation, '{http://www.w3.org/ns/oa#}hasBody',)
-    oahastarget = etree.SubElement(oaannotation,'{http://www.w3.org/ns/oa#}hasTarget')
-    hasbodydesc = etree.SubElement(oahastarget,'{http://www.w3.org/1999/02/22-rdf-syntax-ns#}Description',{'{http://www.w3.org/1999/02/22-rdf-syntax-ns#}about':uri})
-    ispartof = etree.SubElement(hasbodydesc,'{http://purl.org/dc/terms/}isPartOf',{'{http://www.w3.org/1999/02/22-rdf-syntax-ns#}about':uri})
-    source = etree.SubElement(hasbodydesc,'{http://purl.org/dc/terms/}source',{'{http://www.w3.org/1999/02/22-rdf-syntax-ns#}resource':uri})
-    title = etree.SubElement(oaannotation, '{http://purl.org/dc/elements/1.1/}title', {'{http://www.w3.org/XML/1998/namespace}lang':'eng'})
-    title.text = "Morphology of " + word
-    wordslist = etree.SubElement("words")
+    wordslist = etree.Element("words")
     normalizer = Normalizer()
     data = normalizer.normalize(word)
     sentences = sent_tokenize(data)
@@ -62,6 +98,7 @@ def hazmtoalpheios(word,uri):
             words = words.append(word_tokenize(sentence))
         else:
             words = word_tokenize(sentence)
+    analyses = []
     for item in words:
         stemmer = Stemmer()
         wordstem = stemmer.stem(item)
@@ -73,17 +110,31 @@ def hazmtoalpheios(word,uri):
         wordtagged = tagger.tag(item)
         wordpofs = wordtagged[0][1]
         wordpofs = maptohazm(wordpofs)
-        word = etree.SubElement(wordslist,'word')
-        form = etree.SubElement(word, 'form', {'{http://www.w3.org/XML/1998/namespace}lang':'per'})
-        form.text = item
-        entry = etree.SubElement(word, 'entry')
-        infl = etree.SubElement(entry,'inlf')
-        term = etree.SubElement(infl, 'term', {'{http://www.w3.org/XML/1998/namespace}lang':'per'})
-        stem = etree.SubElement(term, 'stem')
-        stem.text = wordstem
-        pofs = etree.SubElement(infl, 'pofs', {'order':wordpofs[1]})
-        pofs.text = wordpofs[0]
-    return root
+        analysis = {}
+        analysis['engine'] = 'hazm'
+        analysis['uri'] = uri
+        analysis['form'] = {}
+        analysis['form']['text'] = item
+        analysis['form']['lang'] = 'per'
+        analysis['entries'] = []
+        entry = {}
+        entry['dict'] = {}
+        entry['dict']['hdwd'] = {}
+        entry['dict']['hdwd']['lang'] = 'per'
+        entry['dict']['hdwd']['text'] = wordstem
+        entry['infls'] = []
+        infl = {}
+        infl['stem'] = {} 
+        infl['stem']['text'] = wordstem
+        infl['stem']['lang'] = 'per'
+        infl['pofs'] = {}
+        if wordpofs:
+            infl['pofs']['order'] = str(wordpofs[1])
+            infl['pofs']['text'] = wordpofs[0]
+        entry['infls'].append(infl)
+        analysis['entries'].append(entry)
+        analyses.append(analysis)
+    return analyses
 
 def maptohazm(wordpofs):
     if wordpofs == "N":
@@ -184,7 +235,7 @@ class EngineListAPI(Resource):
         terms2 = etree.SubElement(enginetwo, "description")
         slcode2 = etree.SubElement(enginetwo, "supportsLanguageCode", {'type':'xs:string', 'maxOccurs':'unbounded', 'minOccours':'1'})
         supopt2 = etree.SubElement(enginetwo, "supportsOption", {'type':'xs:string','maxOccurs':'unbounded','minOccurs':'1'})
-        return etree.tostring(root, pretty_print=True, xml_declaration=True, encoding='utf-8').decode()
+        return root
 
 class EngineAPI(Resource):
     def get(self, id):
@@ -207,7 +258,7 @@ class EngineAPI(Resource):
             slcode = etree.SubElement(engine, "supportsLanguageCode", {'type':'xs:string', 'maxOccurs':'unbounded', 'minOccours':'1'})
             supopt = etree.SubElement(engine, "supportsOption", {'type':'xs:string','maxOccurs':'unbounded','minOccurs':'1'})
         if root:
-            return etree.tostring(root, pretty_print=True, xml_declaration=True, encoding='utf-8').decode()
+            return root
         else:
             abort(404)
 
@@ -220,7 +271,24 @@ class RepoAPI(Resource):
     def get(self, id):
         pass
 '''
-        
+
+'''
+Responds to a Alpheios Legacy API Request
+'''        
+class AlpheiosWordList(Resource):
+    def get(self):
+        parser = reqparse.RequestParser()
+        parser.add_argument('word')
+        args = parser.parse_args()
+        word = args['word']
+        word_uri = 'urn:word:'+word
+        analysis = hazmtoalpheios(word,word_uri)
+        tree = toalpheiosxml(analysis)
+        return tree
+ 
+'''
+Responds to Request for analysis of a single word
+'''        
 class AnalysisWord(Resource):
     def get(self):
         parser = reqparse.RequestParser()
@@ -232,21 +300,20 @@ class AnalysisWord(Resource):
         lang = args['lang']
         engine = args['engine']
         word = args['word']
-        word_uri = ["word_uri"]
+        word_uri = args["word_uri"]
         if not word_uri:
-            word_uri = word
+            word_uri = 'urn:word:'+word
         if lang != 'per':
             return {"error":"unsupported language"},404
         if engine == "hazm":
             analysis = hazmtoalpheios(word,word_uri)
-            tree = etree.ElementTree(analysis)
-            output = etree.tostring(tree, pretty_print=True, xml_declaration=True, encoding='utf-8').decode()
-            return output,201
+            tree = tobspmorph(analysis)
+            return tree,201
         else:
             return {"error":"unknown engine"},404
             
     
-    def post(self, word, engine, lang):
+    def post(self):
         parser = reqparse.RequestParser()
         parser.add_argument('engine')
         parser.add_argument('lang')
@@ -257,13 +324,14 @@ class AnalysisWord(Resource):
         engine = args['engine']
         word = args['word']
         word_uri = args['word_uri']
+        if not word_uri:
+            word_uri = 'urn:word:'+word
         if lang != 'per':
             return {"error":"unsupported language"},404
         if engine == "hazm":
             analysis = hazmtoalpheios(word,word_uri)
-            tree = etree.ElementTree(analysis)
-            output = etree.tostring(tree, pretty_print=True, xml_declaration=True, encoding='utf-8').decode()
-            return output,201
+            tree = tobspmorph(analysis)
+            return tree,201
         else:
             return {"error":"unknown engine"},404
     
@@ -283,10 +351,8 @@ class AnalysisDoc(Resource):
             return {'error':'unsupported engine'},404
         if engine == 'hazm':
             analysis = hazmtoalpheios(doc)
-            tree = etree.ElementTree(analysis)
-            print(etree.tostring(tree, pretty_print=True, xml_declaration=False, encoding='utf-8'))
-            output = etree.tostring(tree, pretty_print=True, xml_declaration=True, encoding='utf-8').decode()
-            return output,201
+            tree = tobspmorph(analysis)
+            return etree,201
         
     def post(self, doc):
         parser = reqparse.RequestParser()
@@ -305,12 +371,9 @@ class AnalysisDoc(Resource):
         if wait == True:
             if engine == 'hazm':
                 analysis = hazmtoalpheios(doc)
-                tree = etree.ElementTree(analysis)
-                print(etree.tostring(tree, pretty_print=True, xml_declaration=False, encoding='utf-8'))
-                output = etree.tostring(tree, pretty_print=True, xml_declaration=True, encoding='utf-8').decode()
-                return output,201
+                tree = tobspmorph(analysis)
+                return tree,201
             
-        
 class AnalysisText(Resource):
     def get(self, text):
         parser = reqparse.RequestParser()
@@ -338,9 +401,8 @@ class AnalysisText(Resource):
         if mime_type == 'text/plain':           
             if engine == "hazm":
                 analysis = hazmtoalpheios(text,text_uri)
-                tree = etree.ElementTree(analysis)
-                output = etree.tostring(tree, pretty_print=True, xml_declaration=True, encoding='utf-8').decode()
-                return output,201
+                tree = tobspmorph(analysis)
+                return tree,201
             else:
                 return {"error":"unknown engine"},404
         else:
@@ -378,9 +440,8 @@ class AnalysisText(Resource):
         if mime_type == 'text/plain':           
             if engine == "hazm":
                 analysis = hazmtoalpheios(text,text_uri)
-                tree = etree.ElementTree(analysis)
-                output = etree.tostring(tree, pretty_print=True, xml_declaration=True, encoding='utf-8').decode()
-                return output,201
+                tree = tobspmorph(analysis)
+                return tree,201
             else:
                 return {"error":"unknown engine"},404
         else:
@@ -392,6 +453,11 @@ class AnalysisText(Resource):
                 else:
                     return {'error':'unsupported Mime_type'},415
 
+    @api.representation('application/xml')
+    def output_xml(data, code, headers=None):
+        resp = app.make_response(etree.tostring(data, pretty_print=True, xml_declaration=True, encoding='utf-8').decode())
+        resp.headers.extend(headers or {})
+        return resp
     
     def _init_(self):
         self.reqparse = reqparse.RequestParser()
@@ -406,9 +472,12 @@ api.add_resource(EngineListAPI, '/morphologyservice/engine')
 api.add_resource(EngineAPI, '/morphologyservice/engine/<EngineId>')
 #api.add_resource(RepoListAPI, '/morphologyservice/repository', endpoint = 'tasks')
 #api.add_resource(RepoAPI, '/morphologyservice/repository/<RepoId>', endpoint = 'tasks')
-api.add_resource(AnalysisWord, '/bsp/morphologyservice/analysis/word')
-api.add_resource(AnalysisDoc, '/bsp/morphologyservice/analysis/document')
-api.add_resource(AnalysisText, '/bsp/morphologyservice/analysis/text')
+api.add_resource(AnalysisWord, '/morphologyservice/analysis/word')
+api.add_resource(AnalysisDoc, '/morphologyservice/analysis/document')
+api.add_resource(AnalysisText, '/morphologyservice/analysis/text')
+
+#this is the legacy Alpheios Service API
+api.add_resource(AlpheiosWordList, '/alpheiosservice/hazm')
 
 
 if __name__ == '__main__':
