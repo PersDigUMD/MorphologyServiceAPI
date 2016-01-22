@@ -1,0 +1,22 @@
+Metadata-Version: 2.0
+Name: hazm
+Version: 0.5.2
+Summary: Python library for digesting Persian text.
+Home-page: http://www.sobhe.ir/hazm/
+Author: Alireza Nourian
+Author-email: az.nourian@gmail.com
+License: UNKNOWN
+Platform: UNKNOWN
+Classifier: Topic :: Text Processing
+Classifier: Natural Language :: Persian
+Classifier: Programming Language :: Python :: 2.7
+Classifier: Programming Language :: Python :: 3.2
+Classifier: Programming Language :: Python :: 3.3
+Classifier: Programming Language :: Python :: 3.4
+Classifier: License :: OSI Approved :: MIT License
+Requires-Dist: nltk (==3.0.5)
+Requires-Dist: libwapiti (>=0.2.1)
+
+UNKNOWN
+
+

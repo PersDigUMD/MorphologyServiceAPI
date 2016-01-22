@@ -1,0 +1,5 @@
+#!/home/balmas/workspace/MorphologyServiceAPI/venv/bin/python3
+
+if __name__ == '__main__':
+    from wapiti.script import run_script
+    run_script()

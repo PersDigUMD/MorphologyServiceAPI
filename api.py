@@ -4,7 +4,7 @@ Created on Nov 7, 2015
 @author: elijah Cooke
 '''
 from __future__ import unicode_literals
-from flask import Flask,abort
+from flask import Flask,abort,make_response
 from flask_restful import Resource, Api, reqparse
 from hazm import POSTagger,word_tokenize, sent_tokenize
 from hazm.Stemmer import Stemmer
@@ -44,6 +44,9 @@ except ImportError:
 app = Flask(__name__)
 api = Api(app)
 
+def make_error(msg,code):
+    return { 'data' : msg, 'format' : 'error' }, code
+
 def toalpheiosxml(analysis):
     root = etree.Element('words')
     for item in analysis:
@@ -74,7 +77,6 @@ def make_annotation_uri(word,engine):
 
 def make_creator_uri(engine):
   return 'org.PersDigUMD:tools.' + engine + '.v1'
-
 
 def tobspmorphjson(analysis):
     annotations = []
@@ -378,12 +380,12 @@ class AnalysisWord(Resource):
         if not word_uri:
             word_uri = 'urn:word:'+word
         if lang != 'per':
-            return {"error":"unsupported language"},404
+            return make_error("unsupported language",404)
         if engine == "hazm":
             analysis = hazmtoalpheios(word,word_uri)
             return { 'data': analysis, 'format':'bsp' },201
         else:
-            return {"error":"unknown engine"},404
+            return make_error("unknown engine",404)
             
     
     def post(self):
@@ -400,12 +402,12 @@ class AnalysisWord(Resource):
         if not word_uri:
             word_uri = 'urn:word:'+word
         if lang != 'per':
-            return {"error":"unsupported language"},404
+            return make_error("unsupported language",404)
         if engine == "hazm":
             analysis = hazmtoalpheios(word,word_uri)
             return { 'data': analysis, 'format':'bsp' },201
         else:
-            return {"error":"unknown engine"},404
+            return make_error("unknown engine",404)
     
 class AnalysisDoc(Resource):
     def get(self, doc):
@@ -420,7 +422,7 @@ class AnalysisDoc(Resource):
         lang = args['lang']
         doc = urllib.request.urlopen(doc_id)
         if lang != 'per':
-            return {'error':'unsupported engine'},404
+            return make_error('unsupported engine',404)
         if engine == 'hazm':
             analysis = hazmtoalpheios(doc)
             return { 'data': analysis, 'format':'bsp' },201
@@ -438,7 +440,7 @@ class AnalysisDoc(Resource):
         wait = args['wait']
         doc = urllib.request.urlopen(doc_id)
         if lang != 'per':
-            return {'error':'unsupported engine'},404
+            return make_error('unsupported engine',404)
         if wait == True:
             if engine == 'hazm':
                 analysis = hazmtoalpheios(doc)
@@ -461,27 +463,27 @@ class AnalysisText(Resource):
         if not engine:
             engine = 'hazm'
         if not text_uri or text:
-            return "error, must supply either a text or a text URI",400
+            return make_error("must supply either a text or a text URI",400)
         if not text_uri:
             text_uri = "unknown text"
         if not text:
             text = urllib.request.urlopen(text_uri)
         if lang != 'per':
-            return {"error":"unsupported language"},404
+            return make_error("unsupported language",404)
         if mime_type == 'text/plain':           
             if engine == "hazm":
                 analysis = hazmtoalpheios(text,text_uri)
                 return { 'data': analysis, 'format':'bsp' },201
             else:
-                return {"error":"unknown engine"},404
+                return make_error("unknown engine",404)
         else:
             if mime_type == 'text/html':
-                return {"error":"unsupported Mime_type"},415
+                return make_error("unsupported Mime_type",415)
             else:
                 if mime_type == 'text/xml':
-                    return {'error':'unsupported Mime_type'},415
+                    return make_error('unsupported Mime_type',415)
                 else:
-                    return {'error':'unsupported Mime_type'},415
+                    return make_error('unsupported Mime_type',415)
     
     def post(self, text):
         parser = reqparse.RequestParser()
@@ -499,27 +501,27 @@ class AnalysisText(Resource):
         if not engine:
             engine = 'hazm'
         if not text_uri or text:
-            return "error, must supply either a text or a text URI",400
+            return make_error("must supply either a text or a text URI",400)
         if not text_uri:
             text_uri = "unknown text"
         if not text:
             text = urllib.request.urlopen(text_uri)
         if lang != 'per':
-            return {"error":"unsupported language"},404
+            return make_error("unsupported language",404)
         if mime_type == 'text/plain':           
             if engine == "hazm":
                 analysis = hazmtoalpheios(text,text_uri)
                 return { 'data': analysis, 'format':'bsp' },201
             else:
-                return {"error":"unknown engine"},404
+                return make_error("unknown engine",404)
         else:
             if mime_type == 'text/html':
-                return {"error":"unsupported Mime_type"},415
+                return make_error("unsupported Mime_type",415)
             else:
                 if mime_type == 'text/xml':
-                    return {'error':'unsupported Mime_type'},415
+                    return make_error('unsupported Mime_type',415)
                 else:
-                    return {'error':'unsupported Mime_type'},415
+                    return make_error('unsupported Mime_type',415)
 
     def _init_(self):
         self.reqparse = reqparse.RequestParser()
@@ -532,9 +534,13 @@ class AnalysisText(Resource):
     
 @api.representation('application/json')
 def output_json(data, code, headers=None): 
-    # legacy alpheios api doesn't support json so just use bsp
-    morph = tobspmorphjson(data['data'])
-    resp = app.make_response(dumps(morph))
+    if data['format'] == 'bsp':
+        obj = tobspmorphjson(data['data'])
+    else:
+        # legacy alpheios api doesn't support json
+        # so only errors here
+        obj = {"error" : data['data'] }
+    resp = make_response(dumps(obj),code)
     resp.headers.extend(headers or {})
     return resp
     
@@ -542,9 +548,12 @@ def output_json(data, code, headers=None):
 def output_xml(data, code, headers=None): 
     if data['format'] == 'bsp':
       xml = tobspmorphxml(data['data'])
-    else:
+    elif data['format'] == 'alpheios':
       xml = toalpheiosxml(data['data'])
-    resp = app.make_response(etree.tostring(xml, pretty_print=True, xml_declaration=True, encoding='utf-8').decode())
+    else:
+        xml = etree.Element('error')
+        xml.text = data['data']
+    resp = make_response(etree.tostring(xml, pretty_print=True, xml_declaration=True, encoding='utf-8').decode(),code)
     resp.headers.extend(headers or {})
     return resp
     
