@@ -4,14 +4,16 @@ Created on Nov 7, 2015
 @author: elijah Cooke
 '''
 from __future__ import unicode_literals
-from flask import Flask,abort, jsonify, json
+from flask import Flask,abort
 from flask_restful import Resource, Api, reqparse
 from hazm import POSTagger,word_tokenize, sent_tokenize
 from hazm.Stemmer import Stemmer
 from hazm.Lemmatizer import Lemmatizer
 from hazm.Normalizer import Normalizer
+from datetime import datetime
 import urllib
 import uuid
+from json import dumps
 
 try:
     from lxml import etree
@@ -67,15 +69,90 @@ def entrytoxml(entry):
         pofs.text = i['pofs']['text']
     return root
 
-def tobspmorph(analysis):
+def make_annotation_uri(word,engine):
+  return 'urn:PersDigUMDMorphologyService:'+word + ':' + engine
+
+def make_creator_uri(engine):
+  return 'org.PersDigUMD:tools.' + engine + '.v1'
+
+
+def tobspmorphjson(analysis):
+    annotations = []
+    for word in analysis:
+        annotation = {}
+        annotation_id = make_annotation_uri(word['form']['text'],word['engine'])
+        annotation['about'] = annotation_id
+        annotation['hasTarget'] = {}
+        annotation['hasTarget']['Description'] = {}
+        annotation['hasTarget']['Description']['about'] = word['uri'] 
+        annotation['title'] = "Morphology of " + word['form']['text']
+        annotation['creator'] = {}
+        annotation['creator']['Agent'] = {}
+        annotation['creator']['Agent']['about'] = make_creator_uri(word['engine'])
+        annotation['created'] = datetime.utcnow().isoformat()
+        hasbodies = []
+        bodies = []
+        for entry in word['entries']:
+            entry_id = str(uuid.uuid1().urn)
+            resource = {}
+            resource['resource'] = entry_id
+            hasbodies.append(resource)
+            body = {}
+            body['about'] = entry_id
+            body['rest'] = {}
+            body['rest']['entry'] = {}
+            body['rest']['entry']['dict'] = {}
+            body['rest']['entry']['dict']['hdwd'] = {}
+            body['rest']['entry']['dict']['hdwd']['lang'] = entry['dict']['hdwd']['lang']
+            body['rest']['entry']['dict']['hdwd']['$'] = entry['dict']['hdwd']['text']
+            infls = []
+            for i in entry['infls']:
+                infl = {}
+                infl['term'] = {}
+                infl['term']['lang'] = i['stem']['lang']
+                infl['term']['stem'] = i['stem']['text']
+                if i['pofs']['text']:
+                    infl['pofs'] = {}
+                    infl['pofs']['order'] = i['pofs']['order']
+                    infl['pofs']['$'] = i['pofs']['text']
+            if len(infls) > 1:
+                body['rest']['infl'] = infls
+            elif len(infls) == 1:
+                body['rest']['infl'] = infls[0]
+            bodies.append(body)
+        if len(bodies) > 1:
+            annotation['hasBody'] = hasbodies
+            annotation['Body'] = bodies
+        elif len(bodies) == 1:
+            annotation['hasBody'] = hasbodies[0]
+            annotation['Body'] = bodies[0]
+        annotations.append(annotation)
+    result = {}
+    result['RDF'] = {}
+    if len(annotations) > 1:
+        result['RDF']['Annotation'] = annotations
+    elif len(annotations) == 1:
+        result['RDF']['Annotation'] = annotations[0]
+    return result
+        
+def make_annotation_uri(word,engine):
+  return 'urn:PersDigUMDMorphologyService:'+word + ':' + engine
+
+
+def tobspmorphxml(analysis):
     root = etree.Element("{http://www.w3.org/1999/02/22-rdf-syntax-ns#}RDF")    
     for word in analysis:
-        annotation_id = 'urn:TuftsMorphologyService:'+word['form']['text'] + ':' + word['engine']
+        annotation_id = make_annotation_uri(word['form']['text'],word['engine'])
         oaannotation = etree.SubElement(root,'{http://www.w3.org/ns/oa#}Annotation',{'{http://www.w3.org/1999/02/22-rdf-syntax-ns#}about': annotation_id})
         oahastarget = etree.SubElement(oaannotation,'{http://www.w3.org/ns/oa#}hasTarget')
         desc = etree.SubElement(oahastarget,'{http://www.w3.org/1999/02/22-rdf-syntax-ns#}Description',{'{http://www.w3.org/1999/02/22-rdf-syntax-ns#}about':word['uri']})
         title = etree.SubElement(oaannotation, '{http://purl.org/dc/elements/1.1/}title', {'{http://www.w3.org/XML/1998/namespace}lang':'eng'})
         title.text = "Morphology of " + word['form']['text']
+        creator = etree.SubElement(oaannotation,'{http://purl.org/dc/terms/}creator')
+        creator_uri = make_creator_uri(word['engine'])
+        agent = etree.SubElement(creator,'{http://xmlns.com/foaf/0.1/}Agent',{'{http://www.w3.org/1999/02/22-rdf-syntax-ns#}about':creator_uri})
+        creator = etree.SubElement(oaannotation,'{http://purl.org/dc/terms/}created')
+        creator.text = datetime.utcnow().isoformat()
         for entry in word['entries']:
             entry_id = str(uuid.uuid1().urn)
             oahasbody = etree.SubElement(oaannotation, '{http://www.w3.org/ns/oa#}hasBody',{'{http://www.w3.org/1999/02/22-rdf-syntax-ns#}resource':entry_id})
@@ -84,8 +161,6 @@ def tobspmorph(analysis):
             content = etree.SubElement(oabody, '{http://www.w3.org/2008/content#}rest')
             content.append(entrytoxml(entry))
     return root
-
-#def analysistojson
 
 def hazmtoalpheios(word,uri):
     wordslist = etree.Element("words")
@@ -283,8 +358,7 @@ class AlpheiosWordList(Resource):
         word = args['word']
         word_uri = 'urn:word:'+word
         analysis = hazmtoalpheios(word,word_uri)
-        tree = toalpheiosxml(analysis)
-        return tree
+        return { 'data': analysis, 'format': 'alpheios' }
  
 '''
 Responds to Request for analysis of a single word
@@ -307,8 +381,7 @@ class AnalysisWord(Resource):
             return {"error":"unsupported language"},404
         if engine == "hazm":
             analysis = hazmtoalpheios(word,word_uri)
-            tree = tobspmorph(analysis)
-            return tree,201
+            return { 'data': analysis, 'format':'bsp' },201
         else:
             return {"error":"unknown engine"},404
             
@@ -330,8 +403,7 @@ class AnalysisWord(Resource):
             return {"error":"unsupported language"},404
         if engine == "hazm":
             analysis = hazmtoalpheios(word,word_uri)
-            tree = tobspmorph(analysis)
-            return tree,201
+            return { 'data': analysis, 'format':'bsp' },201
         else:
             return {"error":"unknown engine"},404
     
@@ -351,8 +423,7 @@ class AnalysisDoc(Resource):
             return {'error':'unsupported engine'},404
         if engine == 'hazm':
             analysis = hazmtoalpheios(doc)
-            tree = tobspmorph(analysis)
-            return etree,201
+            return { 'data': analysis, 'format':'bsp' },201
         
     def post(self, doc):
         parser = reqparse.RequestParser()
@@ -371,8 +442,7 @@ class AnalysisDoc(Resource):
         if wait == True:
             if engine == 'hazm':
                 analysis = hazmtoalpheios(doc)
-                tree = tobspmorph(analysis)
-                return tree,201
+                return { 'data': analysis, 'format':'bsp' },201
             
 class AnalysisText(Resource):
     def get(self, text):
@@ -401,8 +471,7 @@ class AnalysisText(Resource):
         if mime_type == 'text/plain':           
             if engine == "hazm":
                 analysis = hazmtoalpheios(text,text_uri)
-                tree = tobspmorph(analysis)
-                return tree,201
+                return { 'data': analysis, 'format':'bsp' },201
             else:
                 return {"error":"unknown engine"},404
         else:
@@ -440,8 +509,7 @@ class AnalysisText(Resource):
         if mime_type == 'text/plain':           
             if engine == "hazm":
                 analysis = hazmtoalpheios(text,text_uri)
-                tree = tobspmorph(analysis)
-                return tree,201
+                return { 'data': analysis, 'format':'bsp' },201
             else:
                 return {"error":"unknown engine"},404
         else:
@@ -453,12 +521,6 @@ class AnalysisText(Resource):
                 else:
                     return {'error':'unsupported Mime_type'},415
 
-    @api.representation('application/xml')
-    def output_xml(data, code, headers=None):
-        resp = app.make_response(etree.tostring(data, pretty_print=True, xml_declaration=True, encoding='utf-8').decode())
-        resp.headers.extend(headers or {})
-        return resp
-    
     def _init_(self):
         self.reqparse = reqparse.RequestParser()
         self.reqparse.add_argument('mime_type', required = True, type=str, location = 'HTTP')
@@ -467,6 +529,24 @@ class AnalysisText(Resource):
         self.reqparse.add_argument('engine', required = True, type = str, location = 'HTTP')
         self.reqparse.add_argument('lang', required = True, type = str, location = 'HTTP')
         super(AnalysisWord, self).__init__()
+    
+@api.representation('application/json')
+def output_json(data, code, headers=None): 
+    # legacy alpheios api doesn't support json so just use bsp
+    morph = tobspmorphjson(data['data'])
+    resp = app.make_response(dumps(morph))
+    resp.headers.extend(headers or {})
+    return resp
+    
+@api.representation('application/xml')
+def output_xml(data, code, headers=None): 
+    if data['format'] == 'bsp':
+      xml = tobspmorphxml(data['data'])
+    else:
+      xml = toalpheiosxml(data['data'])
+    resp = app.make_response(etree.tostring(xml, pretty_print=True, xml_declaration=True, encoding='utf-8').decode())
+    resp.headers.extend(headers or {})
+    return resp
     
 api.add_resource(EngineListAPI, '/morphologyservice/engine')
 api.add_resource(EngineAPI, '/morphologyservice/engine/<EngineId>')
