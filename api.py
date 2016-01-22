@@ -44,9 +44,16 @@ except ImportError:
 app = Flask(__name__)
 api = Api(app)
 
+'''
+makes an error response that can be represented in either
+json or xml
+'''
 def make_error(msg,code):
     return { 'data' : msg, 'format' : 'error' }, code
 
+'''
+represents an analysis in alpheios legacy service xml format
+'''
 def toalpheiosxml(analysis):
     root = etree.Element('words')
     for item in analysis:
@@ -57,6 +64,9 @@ def toalpheiosxml(analysis):
             word.append(entrytoxml(entry))
     return root
 
+'''
+represents an entry from an analysis in an xml fragment per the alpheios schema
+'''
 def entrytoxml(entry):
     root = etree.Element('entry')
     dic = etree.SubElement(root,'dict')
@@ -72,12 +82,30 @@ def entrytoxml(entry):
         pofs.text = i['pofs']['text']
     return root
 
+'''
+makes a uri for the annotation. This can be whatever makes sense
+for the service provider as long as its a valid URI
+'''
 def make_annotation_uri(word,engine):
   return 'urn:PersDigUMDMorphologyService:'+word + ':' + engine
 
+'''
+makes a uri for the annotation creator. This can be whatever makes sense
+for the service provider as long as its a valid URI
+'''
 def make_creator_uri(engine):
   return 'org.PersDigUMD:tools.' + engine + '.v1'
 
+'''
+makes a uri for an annotation body. Should be unique in the response
+'''
+def make_annotation_uri(word,engine):
+  return 'urn:PersDigUMDMorphologyService:'+word + ':' + engine
+
+'''
+represents an analysis as a dict object adhering to the morphology service 
+api output format and which can be dumped directly to JSON
+'''
 def tobspmorphjson(analysis):
     annotations = []
     for word in analysis:
@@ -137,10 +165,12 @@ def tobspmorphjson(analysis):
         result['RDF']['Annotation'] = annotations[0]
     return result
         
-def make_annotation_uri(word,engine):
-  return 'urn:PersDigUMDMorphologyService:'+word + ':' + engine
 
 
+'''
+represents an analysis as an xml object adhering to the morphology service 
+api output format 
+'''
 def tobspmorphxml(analysis):
     root = etree.Element("{http://www.w3.org/1999/02/22-rdf-syntax-ns#}RDF")    
     for word in analysis:
@@ -187,6 +217,8 @@ def hazmtoalpheios(word,uri):
         wordtagged = tagger.tag(item)
         wordpofs = wordtagged[0][1]
         wordpofs = maptohazm(wordpofs)
+        # a better way to do this would be to create a Python class
+        # to formalize the abstraction
         analysis = {}
         analysis['engine'] = 'hazm'
         analysis['uri'] = uri
@@ -253,6 +285,8 @@ def maptohazm(wordpofs):
     if wordpofs == "e":
         wordpofs = ["ezafe",13]
         return wordpofs
+
+# this hasn't been updated ...
 def hazmtoalpheiosfile(data,uri):
     root = etree.Element("{http://www.w3.org/1999/02/22-rdf-syntax-ns#}RDF")    
     oaannotation = etree.SubElement(root,'{http://www.w3.org/ns/oa#}Annotation',{'{http://www.w3.org/1999/02/22-rdf-syntax-ns#}about':'http://services.projectbamboo.org/morphology'+uri})
