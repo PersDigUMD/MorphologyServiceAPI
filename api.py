@@ -77,7 +77,7 @@ def entrytoxml(entry):
       term = etree.SubElement(infl, 'term', {'{http://www.w3.org/XML/1998/namespace}lang':i['stem']['lang']})
       stem = etree.SubElement(term, 'stem')
       stem.text = i['stem']['text']
-      if i['pofs']['text']:
+      if (i['pofs'] and i['pofs']['text']):
         pofs = etree.SubElement(infl, 'pofs', {'order':i['pofs']['order']})
         pofs.text = i['pofs']['text']
     return root
@@ -141,14 +141,15 @@ def tobspmorphjson(analysis):
                 infl['term'] = {}
                 infl['term']['lang'] = i['stem']['lang']
                 infl['term']['stem'] = i['stem']['text']
-                if i['pofs']['text']:
+                if (i['pofs'] and i['pofs']['text']):
                     infl['pofs'] = {}
                     infl['pofs']['order'] = i['pofs']['order']
                     infl['pofs']['$'] = i['pofs']['text']
+                infls.append(infl)
             if len(infls) > 1:
-                body['rest']['infl'] = infls
+                body['rest']['entry']['infl'] = infls
             elif len(infls) == 1:
-                body['rest']['infl'] = infls[0]
+                body['rest']['entry']['infl'] = infls[0]
             bodies.append(body)
         if len(bodies) > 1:
             annotation['hasBody'] = hasbodies
@@ -250,37 +251,37 @@ def maptohazm(wordpofs):
         wordpofs = ["noun",1]
         return wordpofs
     if wordpofs == "INT":
-        wordpofs = ["Interjection",2]
+        wordpofs = ["interjection",2]
         return wordpofs
     if wordpofs == "DET":
-        wordpofs = ["Determiner",3]
+        wordpofs = ["determiner",3]
         return wordpofs
     if wordpofs == "AJ":
-        wordpofs = ["Adjective",4]
+        wordpofs = ["adjective",4]
         return wordpofs
     if wordpofs == "P":
-        wordpofs = ["Preposition",5]
+        wordpofs = ["preposition",5]
         return wordpofs
     if wordpofs == "PRO":
-        wordpofs = ["Pronoun",6]
+        wordpofs = ["pronoun",6]
         return wordpofs
     if wordpofs == "CONJ":
-        wordpofs = ["Conjunction",7]
+        wordpofs = ["conjunction",7]
         return wordpofs
     if wordpofs == "V":
-        wordpofs = ["Verb",8]
+        wordpofs = ["verb",8]
         return wordpofs
     if wordpofs == "ADV":
-        wordpofs = ["Adverb",9]
+        wordpofs = ["adverb",9]
         return wordpofs
     if wordpofs == "POSTP":
-        wordpofs = ["Postposition",10]
+        wordpofs = ["postposition",10]
         return wordpofs
     if wordpofs == "Num":
-        wordpofs = ["Number",11]
+        wordpofs = ["numeral",11]
         return wordpofs
     if wordpofs == "CL":
-        wordpofs = ["Classifier",12]
+        wordpofs = ["classifier",12]
         return wordpofs
     if wordpofs == "e":
         wordpofs = ["ezafe",13]
