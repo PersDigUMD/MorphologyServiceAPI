@@ -13,6 +13,7 @@ from hazm.Normalizer import Normalizer
 from datetime import datetime
 import urllib
 import uuid
+import os
 from json import dumps
 
 try:
@@ -43,6 +44,9 @@ except ImportError:
 
 app = Flask(__name__)
 api = Api(app)
+
+model_path = os.path.dirname(__file__)
+
 
 '''
 makes an error response that can be represented in either
@@ -214,7 +218,7 @@ def hazmtoalpheios(word,uri):
         wordlema = lemmatizer.lemmatize(item)
         if '#' in wordlema:
             worldleam, garbage = wordlema.split("#")
-        tagger = POSTagger(model="postagger.model")
+        tagger = POSTagger(model=os.path.join(model_path,"postagger.model"))
         wordtagged = tagger.tag(item)
         wordpofs = wordtagged[0][1]
         wordpofs = maptohazm(wordpofs)
@@ -315,7 +319,7 @@ def hazmtoalpheiosfile(data,uri):
         wordlema = lemmatizer.lemmatize(item)
         if '#' in wordlema:
             worldleam, garbage = wordlema.split("#")
-        tagger = POSTagger(model="postagger.model")
+        tagger = POSTagger(model=os.path.join(model_path,"postagger.model"))
         wordtagged = tagger.tag(item)
         wordpofs = wordtagged[0][1]
         word = etree.SubElement(wordslist,'word')
