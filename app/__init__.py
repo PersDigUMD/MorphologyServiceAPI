@@ -15,6 +15,7 @@ import urllib
 import uuid
 import os
 from json import dumps
+from werkzeug.contrib.cache import SimpleCache, MemcachedCache
 
 try:
     from lxml import etree
@@ -44,6 +45,14 @@ except ImportError:
 
 app = Flask(__name__)
 api = Api(app)
+
+'''
+Setup cache for storing analysis, Memcache recomended form of caching but if unable to set up memcache server use the SimpleCache setup.
+'''
+#simplecache setup
+cache = SimpleCache()
+#memcache setup
+cache = MemcachedCache(["Enter_memcache_server_Ip_here"])
 
 model_path = os.path.dirname(__file__)
 
@@ -339,40 +348,55 @@ def casltoalphioes():
         
 class EngineListAPI(Resource):
     def get(self):
-        root = etree.Element("EngineListXMLRepresentation")
-        ouput = etree.ElementTree(root)
-        listmeta = etree.SubElement(root, "listMetadata", {'type':'bsp:listMetadataType'})
-        listentries = etree.SubElement(root, "listEntries")
-        engineone = etree.SubElement(listentries, "listEntry", {"type":"EngineListEntry", 'maxOccurs':"unbounded",'minOccours':'1'})
-        terms1 = etree.SubElement(engineone, "description")
-        slcode1 = etree.SubElement(engineone, "supportsLanguageCode", {'type':'xs:string', 'maxOccurs':'unbounded', 'minOccours':'1'})
-        supopt1 = etree.SubElement(engineone, "supportsOption", {'type':'xs:string','maxOccurs':'unbounded','minOccurs':'1'})
-        enginetwo = etree.SubElement(listentries, "listEntry", {"type":"EngineListEntry", 'maxOccurs':"unbounded",'minOccours':'1'})
-        terms2 = etree.SubElement(enginetwo, "description")
-        slcode2 = etree.SubElement(enginetwo, "supportsLanguageCode", {'type':'xs:string', 'maxOccurs':'unbounded', 'minOccours':'1'})
-        supopt2 = etree.SubElement(enginetwo, "supportsOption", {'type':'xs:string','maxOccurs':'unbounded','minOccurs':'1'})
-        return root
+        cached_enginelist = cache.get("engine_list")
+        if cached_enginelist is None
+            root = etree.Element("EngineListXMLRepresentation")
+            ouput = etree.ElementTree(root)
+            listmeta = etree.SubElement(root, "listMetadata", {'type':'bsp:listMetadataType'})
+            listentries = etree.SubElement(root, "listEntries")
+            engineone = etree.SubElement(listentries, "listEntry", {"type":"EngineListEntry", 'maxOccurs':"unbounded",'minOccours':'1'})
+            terms1 = etree.SubElement(engineone, "description")
+            slcode1 = etree.SubElement(engineone, "supportsLanguageCode", {'type':'xs:string', 'maxOccurs':'unbounded', 'minOccours':'1'})
+            supopt1 = etree.SubElement(engineone, "supportsOption", {'type':'xs:string','maxOccurs':'unbounded','minOccurs':'1'})
+            enginetwo = etree.SubElement(listentries, "listEntry", {"type":"EngineListEntry", 'maxOccurs':"unbounded",'minOccours':'1'})
+            terms2 = etree.SubElement(enginetwo, "description")
+            slcode2 = etree.SubElement(enginetwo, "supportsLanguageCode", {'type':'xs:string', 'maxOccurs':'unbounded', 'minOccours':'1'})
+            supopt2 = etree.SubElement(enginetwo, "supportsOption", {'type':'xs:string','maxOccurs':'unbounded','minOccurs':'1'})
+            cache.set('engine_list', root)
+            return root
+        else:
+            return cached_enginelist
 
 class EngineAPI(Resource):
     def get(self, id):
         if id == "hazm":
-            root = etree.Element("EngineListXMLRepresentation")
-            ouput = etree.ElementTree(root)
-            listmeta = etree.SubElement(root, "listMetadata", {'type':'bsp:listMetadataType'})
-            listentries = etree.SubElement(root, "listEntries")
-            engine = etree.SubElement(listentries, "listEntry", {"type":"EngineListEntry", 'maxOccurs':"unbounded",'minOccours':'1'})
-            terms = etree.SubElement(engine, "description")
-            slcode = etree.SubElement(engine, "supportsLanguageCode", {'type':'xs:string', 'maxOccurs':'unbounded', 'minOccours':'1'})
-            supopt = etree.SubElement(engine, "supportsOption", {'type':'xs:string','maxOccurs':'unbounded','minOccurs':'1'})
+            cached_enginehazm = cache.get("engine_hazm")
+            if cached_enginehazm is None:
+                root = etree.Element("EngineListXMLRepresentation")
+                ouput = etree.ElementTree(root)
+                listmeta = etree.SubElement(root, "listMetadata", {'type':'bsp:listMetadataType'})
+                listentries = etree.SubElement(root, "listEntries")
+                engine = etree.SubElement(listentries, "listEntry", {"type":"EngineListEntry", 'maxOccurs':"unbounded",'minOccours':'1'})
+                terms = etree.SubElement(engine, "description")
+                slcode = etree.SubElement(engine, "supportsLanguageCode", {'type':'xs:string', 'maxOccurs':'unbounded', 'minOccours':'1'})
+                supopt = etree.SubElement(engine, "supportsOption", {'type':'xs:string','maxOccurs':'unbounded','minOccurs':'1'})
+                cache.set('engine_hazm', root)
+            else:
+                root = cached_enginehazm
         if id == "casl":
-            root = etree.Element("EngineListXMLRepresentation")
-            ouput = etree.ElementTree(root)
-            listmeta = etree.SubElement(root, "listMetadata", {'type':'bsp:listMetadataType'})
-            listentries = etree.SubElement(root, "listEntries")
-            engine = etree.SubElement(listentries, "listEntry", {"type":"EngineListEntry", 'maxOccurs':"unbounded",'minOccours':'1'})
-            terms = etree.SubElement(engine, "description")
-            slcode = etree.SubElement(engine, "supportsLanguageCode", {'type':'xs:string', 'maxOccurs':'unbounded', 'minOccours':'1'})
-            supopt = etree.SubElement(engine, "supportsOption", {'type':'xs:string','maxOccurs':'unbounded','minOccurs':'1'})
+            cached_enginecasl = cache.get("engine_casl")
+            if cached_enginecasl is None:
+                root = etree.Element("EngineListXMLRepresentation")
+                ouput = etree.ElementTree(root)
+                listmeta = etree.SubElement(root, "listMetadata", {'type':'bsp:listMetadataType'})
+                listentries = etree.SubElement(root, "listEntries")
+                engine = etree.SubElement(listentries, "listEntry", {"type":"EngineListEntry", 'maxOccurs':"unbounded",'minOccours':'1'})
+                terms = etree.SubElement(engine, "description")
+                slcode = etree.SubElement(engine, "supportsLanguageCode", {'type':'xs:string', 'maxOccurs':'unbounded', 'minOccours':'1'})
+                supopt = etree.SubElement(engine, "supportsOption", {'type':'xs:string','maxOccurs':'unbounded','minOccurs':'1'})
+                cache.set('engine_casl', root)
+            else:
+                root = cached_enginecasl
         if root:
             return root
         else:
@@ -398,7 +422,12 @@ class AlpheiosWordList(Resource):
         args = parser.parse_args()
         word = args['word']
         word_uri = 'urn:word:'+word
-        analysis = hazmtoalpheios(word,word_uri)
+        cached_word = cache.get(word)
+        if cached_word is None:
+            analysis = hazmtoalpheios(word,word_uri)
+            cache.set(word, analysis)
+        else:
+            analysis = cached_word
         return { 'data': analysis, 'format': 'alpheios' }
  
 '''
@@ -416,16 +445,21 @@ class AnalysisWord(Resource):
         engine = args['engine']
         word = args['word']
         word_uri = args["word_uri"]
-        if not word_uri:
-            word_uri = 'urn:word:'+word
-        if lang != 'per':
-            return make_error("unsupported language",404)
-        if engine == "hazm":
-            analysis = hazmtoalpheios(word,word_uri)
-            return { 'data': analysis, 'format':'bsp' },201
+        cached_word = cache.get(word)
+        if cached_word is None:
+            if not word_uri:
+                word_uri = 'urn:word:'+word
+            if lang != 'per':
+                return make_error("unsupported language",404)
+            if engine == "hazm":
+                analysis = hazmtoalpheios(word,word_uri)
+                cache.set(word, analysis)
+                return { 'data': analysis, 'format':'bsp' },201
+            else:
+                return make_error("unknown engine",404)
         else:
-            return make_error("unknown engine",404)
-            
+            analysis = cached_word
+            return { 'data': analysis, 'format':'bsp' },201
     
     def post(self):
         parser = reqparse.RequestParser()
@@ -438,15 +472,21 @@ class AnalysisWord(Resource):
         engine = args['engine']
         word = args['word']
         word_uri = args['word_uri']
-        if not word_uri:
-            word_uri = 'urn:word:'+word
-        if lang != 'per':
-            return make_error("unsupported language",404)
-        if engine == "hazm":
-            analysis = hazmtoalpheios(word,word_uri)
-            return { 'data': analysis, 'format':'bsp' },201
+        cached_word = cache.get(word)
+        if cached_word is None:
+            if not word_uri:
+                word_uri = 'urn:word:'+word
+            if lang != 'per':
+                return make_error("unsupported language",404)
+            if engine == "hazm":
+                analysis = hazmtoalpheios(word,word_uri)
+                cache.set(word, analysis)
+                return { 'data': analysis, 'format':'bsp' },201
+            else:
+                return make_error("unknown engine",404)
         else:
-            return make_error("unknown engine",404)
+            analysis = cached_word
+            return { 'data': analysis, 'format':'bsp' },201 
     
 class AnalysisDoc(Resource):
     def get(self, doc):
@@ -460,10 +500,18 @@ class AnalysisDoc(Resource):
         engine = args['engine']
         lang = args['lang']
         doc = urllib.request.urlopen(doc_id)
-        if lang != 'per':
-            return make_error('unsupported engine',404)
-        if engine == 'hazm':
-            analysis = hazmtoalpheios(doc)
+        cached_doc = cache.get(doc_id)
+        if cached_doc is None:
+            if lang != 'per':
+                return make_error('unsupported language',404)
+            if engine == 'hazm':
+                analysis = hazmtoalpheios(doc)
+                cache.set(doc_id, analysis)
+                return { 'data': analysis, 'format':'bsp' },201
+            else:
+                return make_error('unsupported engine',404)
+        else:
+            analysis = cached_doc
             return { 'data': analysis, 'format':'bsp' },201
         
     def post(self, doc):
@@ -478,12 +526,20 @@ class AnalysisDoc(Resource):
         lang = args['lang']
         wait = args['wait']
         doc = urllib.request.urlopen(doc_id)
-        if lang != 'per':
-            return make_error('unsupported engine',404)
-        if wait == True:
-            if engine == 'hazm':
-                analysis = hazmtoalpheios(doc)
-                return { 'data': analysis, 'format':'bsp' },201
+        cached_doc = cache.get(doc_id)
+        if cached_doc is None:
+            if lang != 'per':
+                return make_error('unsupported language',404)
+            if wait == True:
+                if engine == 'hazm':
+                    analysis = hazmtoalpheios(doc)
+                    cache.set(doc_id, analysis)
+                    return { 'data': analysis, 'format':'bsp' },201
+                else:
+                    return make_error('unsupported engine',404)
+        else:
+            analysis = cached_doc
+            return { 'data': analysis, 'format':'bsp' },201
             
 class AnalysisText(Resource):
     def get(self, text):
@@ -499,31 +555,37 @@ class AnalysisText(Resource):
         mime_type = args['mime_type']
         text = args['text']
         text_uri = ["text_uri"]
-        if not engine:
-            engine = 'hazm'
-        if not text_uri or text:
-            return make_error("must supply either a text or a text URI",400)
-        if not text_uri:
-            text_uri = "unknown text"
-        if not text:
-            text = urllib.request.urlopen(text_uri)
-        if lang != 'per':
-            return make_error("unsupported language",404)
-        if mime_type == 'text/plain':           
-            if engine == "hazm":
-                analysis = hazmtoalpheios(text,text_uri)
-                return { 'data': analysis, 'format':'bsp' },201
-            else:
-                return make_error("unknown engine",404)
-        else:
-            if mime_type == 'text/html':
-                return make_error("unsupported Mime_type",415)
-            else:
-                if mime_type == 'text/xml':
-                    return make_error('unsupported Mime_type',415)
+        cached_text = cache.get(text_uri)
+        if cached_text is None:
+            if not engine:
+                engine = 'hazm'
+            if not text_uri or text:
+                return make_error("must supply either a text or a text URI",400)
+            if not text_uri:
+                text_uri = "unknown text"
+            if not text:
+                text = urllib.request.urlopen(text_uri)
+            if lang != 'per':
+                return make_error("unsupported language",404)
+            if mime_type == 'text/plain':           
+                if engine == "hazm":
+                    analysis = hazmtoalpheios(text,text_uri)
+                    cache.set(text_uri, anaylsis)
+                    return { 'data': analysis, 'format':'bsp' },201
                 else:
-                    return make_error('unsupported Mime_type',415)
-    
+                    return make_error("unknown engine",404)
+            else:
+                if mime_type == 'text/html':
+                    return make_error("unsupported Mime_type",415)
+                else:
+                    if mime_type == 'text/xml':
+                        return make_error('unsupported Mime_type',415)
+                    else:
+                        return make_error('unsupported Mime_type',415)
+        else:
+            analysis = cached_text
+            return { 'data': analysis, 'format':'bsp' },201
+        
     def post(self, text):
         parser = reqparse.RequestParser()
         parser.add_argument('mime_type')
@@ -537,31 +599,37 @@ class AnalysisText(Resource):
         mime_type = args['mime_type']
         text = args['text']
         text_uri = ["text_uri"]
-        if not engine:
-            engine = 'hazm'
-        if not text_uri or text:
-            return make_error("must supply either a text or a text URI",400)
-        if not text_uri:
-            text_uri = "unknown text"
-        if not text:
-            text = urllib.request.urlopen(text_uri)
-        if lang != 'per':
-            return make_error("unsupported language",404)
-        if mime_type == 'text/plain':           
-            if engine == "hazm":
-                analysis = hazmtoalpheios(text,text_uri)
-                return { 'data': analysis, 'format':'bsp' },201
-            else:
-                return make_error("unknown engine",404)
-        else:
-            if mime_type == 'text/html':
-                return make_error("unsupported Mime_type",415)
-            else:
-                if mime_type == 'text/xml':
-                    return make_error('unsupported Mime_type',415)
+        cached_text = cache.get(text_uri)
+        if cached_text is None:
+            if not engine:
+                engine = 'hazm'
+            if not text_uri or text:
+                return make_error("must supply either a text or a text URI",400)
+            if not text_uri:
+                text_uri = "unknown text"
+            if not text:
+                text = urllib.request.urlopen(text_uri)
+            if lang != 'per':
+                return make_error("unsupported language",404)
+            if mime_type == 'text/plain':           
+                if engine == "hazm":
+                    analysis = hazmtoalpheios(text,text_uri)
+                    cache.set(text_uri, anaylsis)
+                    return { 'data': analysis, 'format':'bsp' },201
                 else:
-                    return make_error('unsupported Mime_type',415)
-
+                    return make_error("unknown engine",404)
+            else:
+                if mime_type == 'text/html':
+                    return make_error("unsupported Mime_type",415)
+                else:
+                    if mime_type == 'text/xml':
+                        return make_error('unsupported Mime_type',415)
+                    else:
+                        return make_error('unsupported Mime_type',415)
+        else:
+            analysis = cached_text
+            return { 'data': analysis, 'format':'bsp' },201
+        
     def _init_(self):
         self.reqparse = reqparse.RequestParser()
         self.reqparse.add_argument('mime_type', required = True, type=str, location = 'HTTP')
