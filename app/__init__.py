@@ -211,52 +211,44 @@ def tobspmorphxml(analysis):
 def hazmtoalpheios(word,uri):
     wordslist = etree.Element("words")
     normalizer = Normalizer()
-    data = normalizer.normalize(word)
-    sentences = sent_tokenize(data)
-    words = []
-    for sentence in sentences:
-        if words:
-            words = words.append(word_tokenize(sentence))
-        else:
-            words = word_tokenize(sentence)
+    item = normalizer.normalize(word)
     analyses = []
-    for item in words:
-        stemmer = Stemmer()
-        wordstem = stemmer.stem(item)
-        lemmatizer = Lemmatizer()
-        wordlema = lemmatizer.lemmatize(item)
-        if '#' in wordlema:
-            worldleam, garbage = wordlema.split("#")
-        tagger = POSTagger(model=os.path.join(model_path,"postagger.model"))
-        wordtagged = tagger.tag(item)
-        wordpofs = wordtagged[0][1]
-        wordpofs = maptohazm(wordpofs)
-        # a better way to do this would be to create a Python class
-        # to formalize the abstraction
-        analysis = {}
-        analysis['engine'] = 'hazm'
-        analysis['uri'] = uri
-        analysis['form'] = {}
-        analysis['form']['text'] = item
-        analysis['form']['lang'] = 'per'
-        analysis['entries'] = []
-        entry = {}
-        entry['dict'] = {}
-        entry['dict']['hdwd'] = {}
-        entry['dict']['hdwd']['lang'] = 'per'
-        entry['dict']['hdwd']['text'] = wordstem
-        entry['infls'] = []
-        infl = {}
-        infl['stem'] = {} 
-        infl['stem']['text'] = wordstem
-        infl['stem']['lang'] = 'per'
-        infl['pofs'] = {}
-        if wordpofs:
-            infl['pofs']['order'] = str(wordpofs[1])
-            infl['pofs']['text'] = wordpofs[0]
-        entry['infls'].append(infl)
-        analysis['entries'].append(entry)
-        analyses.append(analysis)
+    stemmer = Stemmer()
+    wordstem = stemmer.stem(item)
+    lemmatizer = Lemmatizer()
+    wordlema = lemmatizer.lemmatize(item)
+    if '#' in wordlema:
+        worldleam, garbage = wordlema.split("#")
+    tagger = POSTagger(model=os.path.join(model_path,"postagger.model"))
+    wordtagged = tagger.tag(word_tokenize(item))
+    wordpofs = wordtagged[0][1]
+    wordpofs = maptohazm(wordpofs)
+    # a better way to do this would be to create a Python class
+    # to formalize the abstraction
+    analysis = {}
+    analysis['engine'] = 'hazm'
+    analysis['uri'] = uri
+    analysis['form'] = {}
+    analysis['form']['text'] = item
+    analysis['form']['lang'] = 'per'
+    analysis['entries'] = []
+    entry = {}
+    entry['dict'] = {}
+    entry['dict']['hdwd'] = {}
+    entry['dict']['hdwd']['lang'] = 'per'
+    entry['dict']['hdwd']['text'] = wordstem
+    entry['infls'] = []
+    infl = {}
+    infl['stem'] = {} 
+    infl['stem']['text'] = wordstem
+    infl['stem']['lang'] = 'per'
+    infl['pofs'] = {}
+    if wordpofs:
+        infl['pofs']['order'] = str(wordpofs[1])
+        infl['pofs']['text'] = wordpofs[0]
+    entry['infls'].append(infl)
+    analysis['entries'].append(entry)
+    analyses.append(analysis)
     return analyses
 
 def maptohazm(wordpofs):
